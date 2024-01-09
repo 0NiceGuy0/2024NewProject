@@ -42,8 +42,9 @@ def get_ror(k=0.5):
     df['ror'] = np.where(df['high'] > df['target'],
                          df['close'] / df['target'],
                          1)
-    ror = df['ror'].cumprod()[-2]
+    ror = df['ror'].cumprod().iloc[-2]
     return ror
+
 
 def get_optimal_k():
     """최적의 k 값 탐색"""
