@@ -71,8 +71,8 @@ while True:
         start_time = get_start_time("KRW-BTC")
         end_time = start_time + datetime.timedelta(days=1)
 
-        # 매일 오전 9시에 optimal_k 업데이트
-        if now.hour == 9 and (now - last_update_time).seconds > 3600:
+         # start_time으로부터 1분 후에 optimal_k 업데이트
+        if now >= start_time + datetime.timedelta(minutes=1) and (now - last_update_time).days >= 1:
             optimal_k = get_optimal_k()
             last_update_time = now
             print(f"Updated optimal k to {optimal_k}")
