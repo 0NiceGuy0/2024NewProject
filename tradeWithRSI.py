@@ -1,11 +1,15 @@
 import time
 import pyupbit
 import pandas as pd
+import logging
+
+# 로깅 설정
+logging.basicConfig(filename='trading_log.log', level=logging.INFO, format='%(asctime)s %(message)s')
 
 access = ""  # 본인의 엑세스 키 입력
 secret = ""  # 본인의 시크릿 키 입력
 upbit = pyupbit.Upbit(access, secret)
-print("autotrade start")
+logging.info("autotrade start")
 
 # 매수 가격 추적을 위한 전역 변수
 buy_price = None
@@ -79,7 +83,7 @@ def trade_logic():
 
     if buy_signal and not buy_price:
         # 매수 로직
-        print("매수")
+        logging.info("매수")
         krw = get_balance("KRW")
         fee_rate = 0.0005  # 거래 수수료율 0.05%
         buy_amount = krw / (1 + fee_rate)  # 실제 매수에 사용할 금액
@@ -89,7 +93,7 @@ def trade_logic():
 
     if sell_signal or check_stop_loss(current_price):
         # 매도 로직
-        print("매도")
+        logging.info("매도")
         btc = get_balance("BTC")
         btc_value = btc * current_price  # BTC 잔고의 현재 원화 가치 계산
         if btc_value > 5000:  # 잔고 가치가 5,000원 이상일 때 매도
@@ -102,5 +106,5 @@ while True:
         trade_logic()        
         time.sleep(1)  # API 호출 빈도 조절
     except Exception as e:
-        print(e)
+        logging.error(f"Error: {e}")
         time.sleep(60)  # 오류 발생 시 재시도 대기 시간 증가
