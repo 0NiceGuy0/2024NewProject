@@ -57,15 +57,20 @@ def get_buy_sell_signals(minute_df, day_df, buy_threshold=30, sell_threshold=70,
     past_rsi.append(rsi.iloc[-1])
     past_rsi = past_rsi[-continuous_count:]  # 최근 연속된 RSI 값만 유지
 
+    # 리스트가 충분한 길이에 도달했는지 확인
+    if len(past_rsi) < continuous_count:
+        return False, False  # 충분한 데이터가 없으면 매매 신호를 생성하지 않음
+
     # 연속된 과매수/과매도 상태 확인
-    overbought = all(r > sell_threshold for r in past_rsi[:-1])  # 마지막을 제외한 과거 RSI가 모두 과매수 상태였는지
-    oversold = all(r < buy_threshold for r in past_rsi[:-1])  # 마지막을 제외한 과거 RSI가 모두 과매도 상태였는지
+    overbought = all(r > sell_threshold for r in past_rsi[:-1])
+    oversold = all(r < buy_threshold for r in past_rsi[:-1])
 
     # RSI 상단선/하단선 돌파 여부
     buy_signal = oversold and rsi.iloc[-1] >= buy_threshold
     sell_signal = overbought and rsi.iloc[-1] <= sell_threshold
 
     return buy_signal, sell_signal
+
 
 
 def check_stop_loss(current_price):
