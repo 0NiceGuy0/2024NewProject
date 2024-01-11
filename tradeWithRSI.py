@@ -16,6 +16,8 @@ buy_price = None
 last_data_update_time = None
 minute_df_cache = None
 day_df_cache = None
+# RSI 추적을 위한 전역 변수
+past_rsi = []
 
 def get_balance(ticker):
     """잔고 조회"""
@@ -47,14 +49,24 @@ def is_upward_trend(dataframe, short_window=5, long_window=20):
     long_ma = dataframe['close'].rolling(window=long_window).mean()
     return short_ma.iloc[-1] > long_ma.iloc[-1]
 
-def get_buy_sell_signals(minute_df, day_df, buy_threshold=30, sell_threshold=70):
+def get_buy_sell_signals(minute_df, day_df, buy_threshold=30, sell_threshold=70, continuous_count=3):
     rsi = get_rsi(minute_df)
+    global past_rsi
 
-    # RSI만을 고려한 매수 및 매도 조건
-    buy_signal = rsi.iloc[-1] < buy_threshold and is_upward_trend(day_df)
-    sell_signal = rsi.iloc[-1] > sell_threshold
+    # 현재 RSI 추가 및 과거 데이터 유지
+    past_rsi.append(rsi.iloc[-1])
+    past_rsi = past_rsi[-continuous_count:]  # 최근 연속된 RSI 값만 유지
+
+    # 연속된 과매수/과매도 상태 확인
+    overbought = all(r > sell_threshold for r in past_rsi[:-1])  # 마지막을 제외한 과거 RSI가 모두 과매수 상태였는지
+    oversold = all(r < buy_threshold for r in past_rsi[:-1])  # 마지막을 제외한 과거 RSI가 모두 과매도 상태였는지
+
+    # RSI 상단선/하단선 돌파 여부
+    buy_signal = oversold and rsi.iloc[-1] >= buy_threshold
+    sell_signal = overbought and rsi.iloc[-1] <= sell_threshold
 
     return buy_signal, sell_signal
+
 
 def check_stop_loss(current_price):
     """손절매 조건 체크"""
@@ -68,7 +80,7 @@ def update_data():
     global last_data_update_time, minute_df_cache, day_df_cache
     current_time = time.time()
 
-    if last_data_update_time is None or (current_time - last_data_update_time) > 10:  # 예: 10초마다 데이터 업데이트
+    if last_data_update_time is None or (current_time - last_data_update_time) > 1:  # 예: 1초마다 데이터 업데이트
         minute_df_cache = pyupbit.get_ohlcv("KRW-BTC", interval="minute1", count=200)
         day_df_cache = pyupbit.get_ohlcv("KRW-BTC", interval="day", count=20)
         last_data_update_time = current_time
@@ -83,7 +95,6 @@ def trade_logic():
 
     if buy_signal and not buy_price:
         # 매수 로직
-        logging.info("매수")
         krw = get_balance("KRW")
         fee_rate = 0.0005  # 거래 수수료율 0.05%
         buy_amount = krw / (1 + fee_rate)  # 실제 매수에 사용할 금액
@@ -93,7 +104,6 @@ def trade_logic():
 
     if sell_signal or check_stop_loss(current_price):
         # 매도 로직
-        logging.info("매도")
         btc = get_balance("BTC")
         btc_value = btc * current_price  # BTC 잔고의 현재 원화 가치 계산
         if btc_value > 5000:  # 잔고 가치가 5,000원 이상일 때 매도
