@@ -65,31 +65,55 @@ def is_high_volume(dataframe, hours=6, multiplier=2):
 
     return current_volume > avg_volume * multiplier
 
-def get_buy_sell_signals(minute_df, day_df, buy_threshold=30, sell_threshold=70, continuous_count=3):
-    rsi = get_rsi(minute_df)
-    global past_rsi
+def track_rsi_highs_lows(rsi_series, lookback=14):
+    """RSI의 고점과 저점을 추적"""
+    highs = []
+    lows = []
+    for i in range(lookback, len(rsi_series)):
+        if rsi_series[i] > rsi_series[i-1] and rsi_series[i] > rsi_series[i+1]:
+            highs.append((i, rsi_series[i]))
+        elif rsi_series[i] < rsi_series[i-1] and rsi_series[i] < rsi_series[i+1]:
+            lows.append((i, rsi_series[i]))
+    return highs, lows
 
-    # 초기 조건 설정
-    overbought = False
-    oversold = False
+def get_failure_swing_signals(rsi_series, overbought=70, oversold=30, lookback=14):
+    """Failure Swing 신호를 파악"""
+    highs, lows = track_rsi_highs_lows(rsi_series, lookback)
+
+    top_failure_swing = False
+    bottom_failure_swing = False
+
+    if highs and lows and len(highs) > 1 and len(lows) > 1:
+        latest_high = highs[-1]
+        previous_low = lows[-2]
+
+        latest_low = lows[-1]
+        previous_high = highs[-2]
+
+        # Top Failure Swing
+        if latest_high[1] > overbought and latest_low[1] < previous_low[1]:
+            top_failure_swing = True
+
+        # Bottom Failure Swing
+        if latest_low[1] < oversold and latest_high[1] > previous_high[1]:
+            bottom_failure_swing = True
+
+    return top_failure_swing, bottom_failure_swing
+
+def get_buy_sell_signals(minute_df, day_df):
+    rsi = get_rsi(minute_df)
+    top_failure_swing, bottom_failure_swing = get_failure_swing_signals(rsi)
 
     # 양봉 및 고거래량 조건 확인
     bullish_candle = is_bullish_candlestick(minute_df)
     high_volume = is_high_volume(minute_df)
     candle_and_volume = bullish_candle and high_volume
-    logging.info(bullish_candle)
-    logging.info(high_volume)
-
-    # RSI 조건 확인
-    buy_signal_rsi = False
-    if len(past_rsi) >= continuous_count:
-        overbought = all(r > sell_threshold for r in past_rsi[:-1])
-        oversold = all(r < buy_threshold for r in past_rsi[:-1])
-        buy_signal_rsi = oversold and rsi.iloc[-1] >= buy_threshold
 
     # 최종 매수 신호
-    buy_signal = (buy_signal_rsi or candle_and_volume) and is_upward_trend(day_df)
-    sell_signal = overbought and rsi.iloc[-1] <= sell_threshold
+    buy_signal = (bottom_failure_swing or candle_and_volume) and is_upward_trend(day_df)
+
+    # 최종 매도 신호
+    sell_signal = top_failure_swing
 
     return buy_signal, sell_signal
 
@@ -139,8 +163,6 @@ def trade_logic():
             upbit.sell_market_order("KRW-BTC", btc)
             buy_price = None  # 매수 가격 초기화
             logging.info(f"Sold at {current_price}, amount: {btc}")
-
-
 
 while True:
     try:
