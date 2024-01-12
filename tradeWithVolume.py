@@ -69,12 +69,14 @@ def track_rsi_highs_lows(rsi_series, lookback=14):
     """RSI의 고점과 저점을 추적"""
     highs = []
     lows = []
-    for i in range(lookback, len(rsi_series)):
-        if rsi_series[i] > rsi_series[i-1] and rsi_series[i] > rsi_series[i+1]:
-            highs.append((i, rsi_series[i]))
-        elif rsi_series[i] < rsi_series[i-1] and rsi_series[i] < rsi_series[i+1]:
-            lows.append((i, rsi_series[i]))
+    for i in range(lookback, len(rsi_series) - 1):
+        if rsi_series.iloc[i] > rsi_series.iloc[i-1] and rsi_series.iloc[i] > rsi_series.iloc[i+1]:
+            highs.append((i, rsi_series.iloc[i]))
+        elif rsi_series.iloc[i] < rsi_series.iloc[i-1] and rsi_series.iloc[i] < rsi_series.iloc[i+1]:
+            lows.append((i, rsi_series.iloc[i]))
     return highs, lows
+
+
 
 def get_failure_swing_signals(rsi_series, overbought=70, oversold=30, lookback=14):
     """Failure Swing 신호를 파악"""
@@ -114,7 +116,6 @@ def get_buy_sell_signals(minute_df, day_df):
 
     # 최종 매도 신호
     sell_signal = top_failure_swing
-
     return buy_signal, sell_signal
 
 
